@@ -1,5 +1,13 @@
-#! /usr/bin/env python 
+#!/usr/bin/env python
 
+"""
+Requires Less Secure App Access enabled. ** Turn off when done **
+https://myaccount.google.com/u/1/lesssecureapps
+
+email password -> ~/ss-email-auth
+"""
+
+import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -9,6 +17,8 @@ class Email(object):
     def __init__(self, santa=False, child=False, to_address=False, debug=False,
                  from_address='alittlegnome@gmail.com'):
 
+        self.email_auth_username = 'alittlegnome@gmail.com'
+        self.email_auth_password = self.get_email_password()
         self.subject = 'You\'re a Secret Santa {0}!!'.format(santa)
         self.from_address = from_address 
         self.to_address = to_address
@@ -43,6 +53,11 @@ class Email(object):
         
         self.html = '{0}{1}{2}'.format(self.html1, self.html2, self.html3)
 
+    def get_email_password(self):
+        with open(os.path.join(os.path.expanduser('~'), 'ss-email-auth'), 'r') as f:
+            res = f.read()
+
+        return res
 
     def send(self):
 
@@ -61,7 +76,7 @@ class Email(object):
         server.ehlo()
         server.starttls()
         server.ehlo()
-        server.login('alittlegnome@gmail.com','f4Pimz9GgUQ8KeUWa4vmw9kBtaFDzG')
+        server.login(self.email_auth_username, self.email.auth.password')
         server.sendmail(self.from_address, self.to_address, msg.as_string())
         server.quit()
 

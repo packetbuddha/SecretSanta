@@ -11,9 +11,7 @@ To Do:
 
 import secret_santa
 
-ss = secret_santa.SecretSanta(email=False, write=True, debug=True)
+ss = secret_santa.SecretSanta(santa_config='santas.yml', email=True, write=True, debug=True)
 matches = ss.run()
 
 print(matches)
-
-

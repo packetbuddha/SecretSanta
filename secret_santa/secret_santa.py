@@ -1,19 +1,26 @@
 #!/usr/bin/env python
 
-# Author: Carl Tewksbury
-# Last Update: 2018-12-17
+"""
+Description: Plays traditional Secret Santa game, printing results to stdout,
+             to files or send via email.
+Author: Carl Tewksbury
+Last Update: 2019-11-27 - Py3-ize; remove unneeded passing of couples var;
+                          email auth password now in file.
+"""
 
+# stdlib
 import random
 import yaml
 import copy
-from collections import OrderedDict
 from datetime import date
 
+# local
 import ssmail
+
 
 class SecretSanta(object):
 
-    def __init__(self, santa_config='santas.yml', debug=False, write=False,
+    def __init__(self, santa_config=None, debug=False, write=False,
                  email=False):
 
         self.santas_config = santa_config
@@ -24,66 +31,71 @@ class SecretSanta(object):
         d = date.today()
         self.year = d.year
 
-    def badmatch(self, couples, santa, pick):
-        """Santa can't pick themselves or anyone in their immediate family
-        (param couples)
+    def badmatch(self, santa, pick):
+        """ Santa can't pick themselves or anyone in their immediate family
 
         Args:
            couples (list): list of tuples, each containing persons who should
            not be matched together
-        ]
+
         Returns:
             True if is bad match, False otherwise
         """
 
-        for couple in self.couples:
-            if couples[santa]['family'] == couples[pick]['family']:
-                return True
-        return
+        res = False
+        if santa == pick or self.couples[santa]['family'] == self.couples[pick]['family']:
+            res = True
 
-    def deadend(self, couples, hat, santa, pick):
+        return res
+
+    def deadend(self, hat, santa, pick):
         """ Detect dead ends - a badmatch() is the only available pick """
 
-        if (len(hat) <= 2) and (self.badmatch(couples, santa, pick)):
-            print "only", len(hat), "left:", hat
-            return True
-        else:
-            return
+        res = False
+        if (len(hat) <= 2) and (self.badmatch(santa, pick)):
+            print("only {0} left: {1}".format(len(hat), hat))
+            res = True
 
-    def _pickfromthehat(self, couples, secretsantas, hat, santa):
-        """ randomly select from the hat and check if its a good pick """
+        return res
+
+    def pick_from_the_hat(self, secretsantas, hat, santa):
+        """ Randomly select from the hat and check if its a good pick """
 
         pick = random.choice(hat)
-        print "santa picked", pick
-        if self.deadend(couples, hat, santa, pick):
-            return ("deadend")
-        elif self.badmatch(couples, santa, pick):
-            return ("badmatch")
+        print("santa picked {}".format(pick))
+
+        if self.deadend(hat, santa, pick):
+            res = ("deadend")
+        elif self.badmatch(santa, pick):
+            res = ("badmatch")
         else:
             hat.remove(pick)
-            print "looks good, man! I removed", pick, "from the hat!"
-            return pick
+            print("looks good, man! I removed {} from the hat!".format(pick))
+            res = pick
 
-    def playsecretsanta(self, couples, secretsantas, hat):
-        """Wrapper for picking function to deal with the results; such as
+        return res
+
+    def play(self, secretsantas, hat):
+        """ Wrapper for picking function to deal with the results; such as
            dead ends resulting in the need to start the game over again
         """
 
         for santa, pick in secretsantas.items():
             santaschoice = False
             while santaschoice == False:
-                print('santa is', santa)
-                mypick = self._pickfromthehat(couples, secretsantas, hat, santa)
+                print('santa is {} ... '.format(santa), end='')
+                mypick = self.pick_from_the_hat(secretsantas, hat, santa)
                 if mypick == "deadend":
-                    print "crap, deadend!"
+                    print("crap, deadend!")
                     return True
                 elif mypick == "badmatch":
-                    print "crap, bad match!"
+                    print("crap, bad match!")
                     continue
                 elif mypick:
-                    print "adding match...", santa, "->", mypick
+                    print("adding match...", santa, "->", mypick)
                     secretsantas[santa] = mypick
                     santaschoice = True
+
         return False
 
     def _makefiles(self, secretsantas):
@@ -106,7 +118,7 @@ class SecretSanta(object):
 
     def _load_config(self):
         with open(self.santas_config, 'r') as f:
-            return yaml.load(f)
+            return yaml.safe_load(f)
 
     def makefiles(self, secretsantas):
         for santa, pick in secretsantas.iteritems():
@@ -116,21 +128,18 @@ class SecretSanta(object):
             with open(santaf, 'w+') as f:
               f.write(message)
 
-    def load_config(self):
-        with open(self.santas_config, 'r') as f:
-            return yaml.load(f)
-
     def run(self):
         keepplaying = True
-        while keepplaying:
 
+        while keepplaying:
             hat = []
+            secretsantas = {}
+
+            # Each time we play again, reinitialize the elves data
+            self.couples = self._load_config()
 
             if self.debug:
-              print self.couples
-
-            hat = []
-            secretsantas = OrderedDict()
+              print(self.couples)
 
             # Create list of santas in the hat using couples data
             secretsantas = copy.deepcopy(self.couples)
@@ -138,14 +147,10 @@ class SecretSanta(object):
             for santa in secretsantas:
                 hat.append(santa)
 
-            keepplaying = self.playsecretsanta(self.couples, secretsantas, hat)
+            keepplaying = self.play(secretsantas, hat)
 
             if self.debug:
-                print('secret santas: {}').format(secretsantas)
-
-            # Each time we play again, we reinitialize our elves data
-            if keepplaying:
-                self.couples = self._load_config()
+                print('secret santas: {}'.format(secretsantas))
 
         print('makefile:', self.write)
         print('sendmail:', self.email)
